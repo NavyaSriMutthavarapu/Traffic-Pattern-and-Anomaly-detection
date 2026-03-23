@@ -7,16 +7,10 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.decomposition import PCA
 
-# -----------------------------
-# PAGE CONFIG
-# -----------------------------
-st.set_page_config(page_title="Traffic Analysis", layout="wide")
-st.title("🚦 Traffic Pattern & Anomaly Detection")
+st.set_page_config(page_title="Anomaly Detection", layout="wide")
+st.title("🚀 Anomaly Detection Dashboard")
 
-# -----------------------------
-# FILE UPLOAD
-# -----------------------------
-uploaded_file = st.file_uploader("Upload Traffic Dataset", type=["csv"])
+uploaded_file = st.file_uploader("Upload Dataset", type=["csv"])
 
 if uploaded_file is not None:
 
@@ -26,192 +20,100 @@ if uploaded_file is not None:
     st.dataframe(df.head())
 
     # -----------------------------
-    # SAFE DATE HANDLING
+    # UNIVERSAL FEATURE SELECTION
     # -----------------------------
-    if 'date_time' in df.columns:
-        df['date_time'] = pd.to_datetime(df['date_time'], errors='coerce')
+    numeric_df = df.select_dtypes(include=np.number)
 
-        if df['date_time'].isna().sum() > 0:
-            st.warning("⚠️ Some date_time values could not be parsed")
-
-        df = df.dropna(subset=['date_time'])
-
-        if len(df) == 0:
-            st.error("❌ No valid date_time data")
-            st.stop()
-
-        df = df.sort_values('date_time')
-        df['hour'] = df['date_time'].dt.hour
-
-    # -----------------------------
-    # REQUIRED COLUMNS CHECK
-    # -----------------------------
-    required_cols = ['traffic_volume','temp','rain_1h','snow_1h','clouds_all']
-
-    missing = [col for col in required_cols if col not in df.columns]
-
-    if missing:
-        st.error(f"❌ Missing columns: {missing}")
+    if numeric_df.shape[1] < 2:
+        st.error("❌ Need at least 2 numeric columns")
         st.stop()
 
-    # -----------------------------
-    # FEATURE PREPARATION (ROBUST)
-    # -----------------------------
-    features = df[required_cols].copy()
+    features = numeric_df.copy()
 
-    if 'hour' in df.columns:
-        features['hour'] = df['hour']
-
-    # Handle inf + NaN
+    # Clean data (VERY IMPORTANT)
     features = features.replace([np.inf, -np.inf], np.nan)
     features = features.fillna(features.median())
 
-    # Ensure enough data
+    # Ensure enough rows
     if len(features) < 10:
-        st.error("❌ Not enough data for clustering")
+        st.error("❌ Not enough data")
         st.stop()
+
+    st.write("DEBUG:", features.shape)
 
     # -----------------------------
     # SCALING + PCA
     # -----------------------------
-    try:
-        scaler = StandardScaler()
-        scaled_data = scaler.fit_transform(features)
+    scaler = StandardScaler()
+    scaled_data = scaler.fit_transform(features)
 
-        pca = PCA(n_components=2)
-        pca_data = pca.fit_transform(scaled_data)
-
-    except Exception as e:
-        st.error(f"❌ Processing Error: {e}")
-        st.stop()
+    pca = PCA(n_components=2)
+    pca_data = pca.fit_transform(scaled_data)
 
     # -----------------------------
     # TABS
     # -----------------------------
     tab1, tab2, tab3 = st.tabs(["📊 EDA", "🔵 KMeans", "🔴 DBSCAN"])
 
-    # =====================================================
-    # 📊 EDA (CLEAN)
-    # =====================================================
+    # -----------------------------
+    # EDA
+    # -----------------------------
     with tab1:
 
-        # 1. Daily Trend
-        if 'date_time' in df.columns:
-            st.subheader("📅 Daily Traffic Trend")
+        st.subheader("📊 Feature Distribution")
 
-            daily = df.resample('D', on='date_time')['traffic_volume'].mean()
-
-            fig, ax = plt.subplots(figsize=(7,4))
-            ax.plot(daily.index, daily.values)
-            ax.set_title("Daily Average Traffic")
-            ax.grid(True, linestyle='--', alpha=0.5)
+        for col in features.columns[:3]:
+            fig, ax = plt.subplots(figsize=(6,4))
+            ax.hist(features[col], bins=30)
+            ax.set_title(col)
             plt.tight_layout()
             st.pyplot(fig)
 
-        # 2. Hourly Pattern
-        st.subheader("⏰ Average Traffic by Hour")
-
-        hourly = df.groupby('hour')['traffic_volume'].mean()
-
-        fig, ax = plt.subplots(figsize=(6,4))
-        ax.plot(hourly.index, hourly.values, marker='o')
-        ax.set_title("Traffic Pattern by Hour")
-        ax.set_xlabel("Hour")
-        ax.set_ylabel("Traffic Volume")
-        ax.grid(True, linestyle='--', alpha=0.5)
-        plt.tight_layout()
-        st.pyplot(fig)
-
-        # 3. Boxplot
-        st.subheader("📦 Traffic Distribution by Hour")
-
-        fig, ax = plt.subplots(figsize=(6,4))
-        df.boxplot(column='traffic_volume', by='hour', ax=ax)
-        plt.title("Traffic Distribution per Hour")
-        plt.suptitle("")
-        plt.tight_layout()
-        st.pyplot(fig)
-
-        # 4. Scatter
-        st.subheader("🌡️ Temperature vs Traffic")
-
-        fig, ax = plt.subplots(figsize=(6,4))
-        ax.scatter(df['temp'], df['traffic_volume'], alpha=0.3)
-        ax.set_xlabel("Temperature")
-        ax.set_ylabel("Traffic Volume")
-        ax.grid(True, linestyle='--', alpha=0.5)
-        plt.tight_layout()
-        st.pyplot(fig)
-
-    # =====================================================
-    # 🔵 KMEANS
-    # =====================================================
+    # -----------------------------
+    # KMEANS
+    # -----------------------------
     with tab2:
 
-        st.subheader("🔵 K-Means Clustering")
-
-        k = st.slider("Select number of clusters", 2, 6, 3)
+        k = st.slider("Clusters", 2, 6, 3)
 
         kmeans = KMeans(n_clusters=k, random_state=42)
         df['kmeans'] = kmeans.fit_predict(scaled_data)
 
         fig, ax = plt.subplots(figsize=(6,5))
         ax.scatter(pca_data[:,0], pca_data[:,1], c=df['kmeans'])
-        ax.set_title("KMeans Clusters")
-        ax.grid(True, linestyle='--', alpha=0.5)
+        ax.set_title("KMeans")
         plt.tight_layout()
         st.pyplot(fig)
 
-        st.subheader("📊 Cluster Count")
-        st.bar_chart(df['kmeans'].value_counts())
-
-        # DOWNLOAD
-        csv_kmeans = df.to_csv(index=False).encode('utf-8')
-        st.download_button("⬇️ Download KMeans Results", csv_kmeans, "kmeans.csv")
-
-    # =====================================================
-    # 🔴 DBSCAN (STABLE)
-    # =====================================================
+    # -----------------------------
+    # DBSCAN (100% SAFE)
+    # -----------------------------
     with tab3:
 
-        st.subheader("🔴 DBSCAN Anomaly Detection")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            eps = st.slider("eps", 0.1, 5.0, 1.5)
-
-        with col2:
-            min_samples = st.slider("min_samples", 2, 10, 3)
+        eps = st.slider("eps", 0.1, 5.0, 1.5)
+        min_samples = st.slider("min_samples", 2, 10, 3)
 
         try:
             db = DBSCAN(eps=eps, min_samples=min_samples)
-            df['dbscan'] = db.fit_predict(scaled_data)
+            labels = db.fit_predict(scaled_data)
+
+            df['dbscan'] = labels
+
+            colors = np.where(labels == -1, 'red', 'blue')
+
+            fig, ax = plt.subplots(figsize=(6,5))
+            ax.scatter(pca_data[:,0], pca_data[:,1], c=colors)
+            ax.set_title("DBSCAN")
+            plt.tight_layout()
+            st.pyplot(fig)
+
+            anomalies = df[df['dbscan'] == -1]
+
+            st.write("🚨 Anomalies:", len(anomalies))
+            st.dataframe(anomalies.head())
+
         except Exception as e:
-            st.error(f"❌ DBSCAN Error: {e}")
-            st.stop()
-
-        colors = np.where(df['dbscan'] == -1, 'red', 'blue')
-
-        fig, ax = plt.subplots(figsize=(6,5))
-        ax.scatter(pca_data[:,0], pca_data[:,1], c=colors)
-        ax.set_title("DBSCAN Result")
-        ax.grid(True, linestyle='--', alpha=0.5)
-        plt.tight_layout()
-        st.pyplot(fig)
-
-        anomalies = df[df['dbscan'] == -1]
-
-        st.subheader("🚨 Detected Anomalies")
-        st.write(f"Total anomalies: {len(anomalies)}")
-        st.dataframe(anomalies.head())
-
-        # DOWNLOAD
-        csv_full = df.to_csv(index=False).encode('utf-8')
-        csv_anomaly = anomalies.to_csv(index=False).encode('utf-8')
-
-        st.download_button("⬇️ Download Full Data", csv_full, "full_data.csv")
-        st.download_button("⬇️ Download Anomalies", csv_anomaly, "anomalies.csv")
+            st.error(f"DBSCAN Failed: {e}")
 
 else:
-    st.info("📂 Please upload a dataset to start analysis")
+    st.info("Upload a dataset to begin")
