@@ -136,7 +136,9 @@ if uploaded_file is not None:
     st.subheader("🚨 Detected Anomalies")
 
     anomalies = df[df['dbscan'] == -1]
+    st.write(f"Total anomalies: {len(anomalies)}")
     st.write(anomalies.head())
+    
 
     # -----------------------------
     # DOWNLOAD OPTIONS (ADDED)
