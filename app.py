@@ -26,22 +26,25 @@ if uploaded_file is not None:
     st.dataframe(df.head())
 
     # -----------------------------
-    # PREPROCESSING (FIXED)
+    # SAFE DATE HANDLING
     # -----------------------------
     if 'date_time' in df.columns:
         df['date_time'] = pd.to_datetime(df['date_time'], errors='coerce')
 
-        # Drop invalid date rows
+        if df['date_time'].isna().sum() > 0:
+            st.warning("⚠️ Some date_time values could not be parsed")
+
         df = df.dropna(subset=['date_time'])
 
-        # Extract hour
+        if len(df) == 0:
+            st.error("❌ No valid date_time data")
+            st.stop()
+
+        df = df.sort_values('date_time')
         df['hour'] = df['date_time'].dt.hour
 
-    if 'holiday' in df.columns:
-        df['holiday'] = df['holiday'].fillna('None')
-
     # -----------------------------
-    # REQUIRED COLUMN CHECK
+    # REQUIRED COLUMNS CHECK
     # -----------------------------
     required_cols = ['traffic_volume','temp','rain_1h','snow_1h','clouds_all']
 
@@ -52,16 +55,21 @@ if uploaded_file is not None:
         st.stop()
 
     # -----------------------------
-    # FEATURE PREP (ROBUST)
+    # FEATURE PREPARATION (ROBUST)
     # -----------------------------
     features = df[required_cols].copy()
 
     if 'hour' in df.columns:
         features['hour'] = df['hour']
-        features['hour'] = features['hour'].fillna(features['hour'].median())
 
-    # Fill remaining NaN using median
+    # Handle inf + NaN
+    features = features.replace([np.inf, -np.inf], np.nan)
     features = features.fillna(features.median())
+
+    # Ensure enough data
+    if len(features) < 10:
+        st.error("❌ Not enough data for clustering")
+        st.stop()
 
     # -----------------------------
     # SCALING + PCA
@@ -83,7 +91,7 @@ if uploaded_file is not None:
     tab1, tab2, tab3 = st.tabs(["📊 EDA", "🔵 KMeans", "🔴 DBSCAN"])
 
     # =====================================================
-    # 📊 EDA (CLEAN + PROFESSIONAL)
+    # 📊 EDA (CLEAN)
     # =====================================================
     with tab1:
 
@@ -124,7 +132,7 @@ if uploaded_file is not None:
         plt.tight_layout()
         st.pyplot(fig)
 
-        # 4. Scatter (FIXED CLUTTER)
+        # 4. Scatter
         st.subheader("🌡️ Temperature vs Traffic")
 
         fig, ax = plt.subplots(figsize=(6,4))
@@ -162,7 +170,7 @@ if uploaded_file is not None:
         st.download_button("⬇️ Download KMeans Results", csv_kmeans, "kmeans.csv")
 
     # =====================================================
-    # 🔴 DBSCAN (FULLY FIXED)
+    # 🔴 DBSCAN (STABLE)
     # =====================================================
     with tab3:
 
