@@ -26,10 +26,15 @@ if uploaded_file is not None:
     st.dataframe(df.head())
 
     # -----------------------------
-    # PREPROCESSING
+    # PREPROCESSING (FIXED)
     # -----------------------------
     if 'date_time' in df.columns:
         df['date_time'] = pd.to_datetime(df['date_time'], errors='coerce')
+
+        # Drop invalid date rows
+        df = df.dropna(subset=['date_time'])
+
+        # Extract hour
         df['hour'] = df['date_time'].dt.hour
 
     if 'holiday' in df.columns:
@@ -47,14 +52,16 @@ if uploaded_file is not None:
         st.stop()
 
     # -----------------------------
-    # FEATURE PREP
+    # FEATURE PREP (ROBUST)
     # -----------------------------
     features = df[required_cols].copy()
 
     if 'hour' in df.columns:
         features['hour'] = df['hour']
+        features['hour'] = features['hour'].fillna(features['hour'].median())
 
-    features = features.fillna(0)
+    # Fill remaining NaN using median
+    features = features.fillna(features.median())
 
     # -----------------------------
     # SCALING + PCA
@@ -76,11 +83,11 @@ if uploaded_file is not None:
     tab1, tab2, tab3 = st.tabs(["📊 EDA", "🔵 KMeans", "🔴 DBSCAN"])
 
     # =====================================================
-    # 📊 EDA (FINAL FIXED)
+    # 📊 EDA (CLEAN + PROFESSIONAL)
     # =====================================================
     with tab1:
 
-        # ✅ 1. Daily Trend
+        # 1. Daily Trend
         if 'date_time' in df.columns:
             st.subheader("📅 Daily Traffic Trend")
 
@@ -93,7 +100,7 @@ if uploaded_file is not None:
             plt.tight_layout()
             st.pyplot(fig)
 
-        # ✅ 2. Hourly Pattern
+        # 2. Hourly Pattern
         st.subheader("⏰ Average Traffic by Hour")
 
         hourly = df.groupby('hour')['traffic_volume'].mean()
@@ -107,7 +114,7 @@ if uploaded_file is not None:
         plt.tight_layout()
         st.pyplot(fig)
 
-        # ✅ 3. Boxplot
+        # 3. Boxplot
         st.subheader("📦 Traffic Distribution by Hour")
 
         fig, ax = plt.subplots(figsize=(6,4))
@@ -117,7 +124,7 @@ if uploaded_file is not None:
         plt.tight_layout()
         st.pyplot(fig)
 
-        # ✅ 4. Scatter (ADDED)
+        # 4. Scatter (FIXED CLUTTER)
         st.subheader("🌡️ Temperature vs Traffic")
 
         fig, ax = plt.subplots(figsize=(6,4))
@@ -155,7 +162,7 @@ if uploaded_file is not None:
         st.download_button("⬇️ Download KMeans Results", csv_kmeans, "kmeans.csv")
 
     # =====================================================
-    # 🔴 DBSCAN
+    # 🔴 DBSCAN (FULLY FIXED)
     # =====================================================
     with tab3:
 
