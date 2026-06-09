@@ -1,6 +1,3 @@
-# Here's a **professional GitHub README** that looks much better than a college-project style README and matches what your Streamlit application actually does.
-
----
 
 # 🚦 Traffic Pattern & Anomaly Detection
 
