@@ -226,7 +226,7 @@ Traffic-Pattern-And-Anomaly-Detection
 
 ## 👨‍💻 Author
 
-**Sree**
+**M.Navya Sri**
 
 ### Project Type
 
